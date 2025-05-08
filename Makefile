@@ -3,8 +3,10 @@ spennylcd_mod-objs = spennylcd.o spennylcd_i2c.o
 
 PWD := $(CURDIR)
 
+KERNEL_DIR=../linux
+
 all:
-	$(MAKE) -C ../linux-6.6.78/ M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
 
 clean:
-	$(MAKE) -C ../linux-6.6.78/ M=$(PWD) clean
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
