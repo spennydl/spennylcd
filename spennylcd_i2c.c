@@ -10,22 +10,23 @@ spenny__i2c_send_byte_and_latch(struct i2c_client* client, u8 byte)
 {
     int status = 0;
 
-    // TODO: do I need to delay?
     u8 b = byte;
     status = i2c_smbus_write_byte(client, b);
     if (status < 0)
         return status;
 
+    // wait for data on the bus
     udelay(1);
     b = byte | SPENNY_E_SET;
     status = i2c_smbus_write_byte(client, b);
     if (status < 0)
         return status;
 
+    // E should be set for at least 800ns
     udelay(1);
     b = byte;
     status = i2c_smbus_write_byte(client, b);
-
+    // E is unset, wait at least an LCD cycle to settle
     udelay(1);
 
     return status;

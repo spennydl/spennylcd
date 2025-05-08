@@ -32,6 +32,7 @@ static struct spenny_lcd_data spenny_lcd_data = { };
 static ssize_t
 spenny_read_dev(struct file *f, char __user *buf, size_t user_bufsiz, loff_t *offset)
 {
+    // This device is write-only
     return -EINVAL;
 }
 
@@ -41,22 +42,19 @@ spenny_write_dev(struct file *f, const char __user *buf, size_t user_bufsiz, lof
     int max_bufsiz = 10;
     char our_buf[11];
     int bufsiz = user_bufsiz;
-    if (bufsiz > max_bufsiz) {
+    if (bufsiz > max_bufsiz)
         bufsiz = max_bufsiz;
-    }
 
     if (copy_from_user(our_buf, buf, bufsiz))
         return -EFAULT;
 
     our_buf[bufsiz] = '\0';
-    pr_info("Got %s\n", our_buf);
     for (int i = 0; i < bufsiz && our_buf[i]; i++) {
-       if (our_buf[i] >= 0x20) {
-           int err = spenny_i2c_send_char(spenny_lcd_data.client, our_buf[i]);
-
-           if (err)
-            return err;
-       }
+	   if (our_buf[i] >= 0x20) {
+		   int err = spenny_i2c_send_char(spenny_lcd_data.client, our_buf[i]);
+		   if (err)
+               return err;
+	   }
     }
 
     *offset += bufsiz;
@@ -66,14 +64,12 @@ spenny_write_dev(struct file *f, const char __user *buf, size_t user_bufsiz, lof
 static int
 spenny_open_dev(struct inode *in, struct file *f)
 {
-    if (f->f_mode & FMODE_READ)
-        return -EPERM;
-
-    if (atomic_cmpxchg(&is_open, 0, 1))
+    if (atomic_cmpxchg(&is_open, 0, 1)) {
         return -EBUSY;
+    }
     try_module_get(THIS_MODULE);
 
-    return nonseekable_open(in, f);
+    return 0;
 }
 
 static int
@@ -100,10 +96,11 @@ static struct miscdevice spenny_miscdev = {
 static int
 spenny_create_lcd_misc(struct i2c_client *client)
 {
-    // TODO
     int result = misc_register(&spenny_miscdev);
-    if (result < 0)
+    if (result < 0) {
+        pr_alert("failed to register device");
         return result;
+    }
 
     spenny_lcd_data.client = client;
     return result;
@@ -120,16 +117,14 @@ spenny_lcd_probe(struct i2c_client *client)
     if (init_status < 0)
         return init_status;
 
-    pr_alert("lcd inited, creating misc dev...\n");
+    pr_info("spennylcd found a device\n");
     return spenny_create_lcd_misc(client);
 }
 
 static void
 spenny_lcd_remove(struct i2c_client *client)
 {
-    // remove the misc device
-    pr_info("remove\n");
-    spenny_lcd_data.client = NULL;
+    misc_deregister(&spenny_miscdev);
 }
 
 static struct i2c_driver spenny_i2c_drv = {
@@ -138,7 +133,7 @@ static struct i2c_driver spenny_i2c_drv = {
         .of_match_table = spenny_of_table
     },
     .probe = spenny_lcd_probe,
-    .remove = spenny_lcd_remove, // when would this be called? on i2c_del_driver?
+    .remove = spenny_lcd_remove,
     .id_table = spenny_dev_ids,
 };
 
